@@ -105,8 +105,12 @@ class ResourceRegistry(object):
         if deform_version.startswith('0'):
             #Default resources are marked as 'deform' in deform <2
             from deform.widget import default_resources
-            paths.extend(default_resources['deform'][None]['js'])
-            paths.extend(default_resources['deform'][None]['css'])
+            for res_type in ('js', 'css'):
+                res = default_resources['deform'][None][res_type]
+                if isinstance(res, str):
+                    paths.append(res)
+                else:
+                    paths.extend(res)
         if deform_version.startswith('2'):
             #requirements
             paths.extend(['deform:static/css/form.css',

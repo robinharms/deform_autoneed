@@ -34,17 +34,15 @@ class ResourceRegistryTests(TestCase):
 
     def test_create_requirement_for_deform_1_style(self):
         reg = self._cut(add_basics = False)
-        from deform_autoneed import deform_autoneed_lib
-        print deform_autoneed_lib.known_resources
-        reg.create_requirement_for('something', 'css/form.css', depends = [])
+        reg.create_requirement_for('something', 'css/beautify.css', depends = [])
         self.assertIn('something', reg.requirements)
-        self.assertIn('css/form.css', reg.paths)        
+        self.assertIn('css/beautify.css', reg.paths)
  
     def test_create_requirement_for_deform_2_style(self):
         reg = self._cut()
-        reg.create_requirement_for('something', 'deform:static/css/form.css', depends = [])
+        reg.create_requirement_for('something', 'deform:static/css/beautify.css', depends = [])
         self.assertIn('something', reg.requirements)
-        self.assertIn('deform:static/css/form.css', reg.paths)        
+        self.assertIn('deform:static/css/beautify.css', reg.paths)
  
     def test_create_requirement_for_other_lib(self):
         reg = self._cut()
