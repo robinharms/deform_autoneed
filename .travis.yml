@@ -7,11 +7,11 @@ python:
 
 script:
   - pip install . -r requirements_deform_0.9.5.txt
-  - nosetests
+  - python setup.py test
   - pip install . -r requirements_deform_0.9.9.txt
-  - nosetests
+  - python setup.py test
   - pip install . -r requirements_deform_2.0.a2.txt
-  - nosetests
+  - python setup.py test
   - pip install -U deform colander
-  - nosetests
+  - python setup.py test
 
