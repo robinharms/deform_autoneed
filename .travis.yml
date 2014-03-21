@@ -6,7 +6,7 @@ python:
   - 3.3
 
 script:
-  - if [[ $TRAVIS_PYTHON_VERSION != 3*]]; then pip install . -r requirements_deform_0.9.5.txt && python setup.py test; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == '2.7']]; then pip install . -r requirements_deform_0.9.5.txt && python setup.py test; fi
   - pip install . -r requirements_deform_0.9.9.txt
   - python setup.py test
   - pip install . -r requirements_deform_2.0.a2.txt
