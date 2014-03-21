@@ -111,15 +111,26 @@ class ResourceRegistry(object):
                     paths.append(res)
                 else:
                     paths.extend(res)
-        if deform_version.startswith('2'):
-            #requirements
+        else:
+            #Deform 2-style has package info as well. We use it as a fanstatic library name too
+            #Guess jquery name
+            import os
+            import re
+            scripts_dir = pkg_resources.resource_filename('deform', 'static/scripts')
+            jquery_fname = None
+            for fname in os.listdir(scripts_dir):
+                if re.match('^jquery\-[0-9]{1,2}(.*)\.min\.js$', fname):
+                    jquery_fname = fname
+                    break
+            if not jquery_fname:
+                raise IOError("Can't fint any jquery file within deform.")
             paths.extend(['deform:static/css/form.css',
                           'deform:static/css/bootstrap.min.css',
                           'deform:static/scripts/bootstrap.min.js',
-                          'deform:static/scripts/jquery-2.0.3.min.js',])
+                          'deform:static/scripts/%s' % jquery_fname,])
             #Pre-register bootstrap and dependency on jquery
-            jquery = Resource(deform_autoneed_lib, 'scripts/jquery-2.0.3.min.js')
-            self.paths['deform:static/scripts/jquery-2.0.3.min.js'] = jquery
+            jquery = Resource(deform_autoneed_lib, "scripts/%s" % jquery_fname)
+            self.paths["deform:static/scripts/%s" % jquery_fname] = jquery
             self.paths['deform:static/scripts/bootstrap.min.js'] = Resource(deform_autoneed_lib, 'scripts/bootstrap.min.js',
                                                                            depends = (jquery,))
         self.create_requirement_for('basic', paths, depends=())
