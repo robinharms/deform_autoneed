@@ -22,11 +22,7 @@ class ResourceRegistry(object):
             
             A typical entry for deform 2 would be:
             
-            {'jquery.form': ['deform:static/scripts/jquery-1.4.2.min.js', 'deform:static/scripts/jquery.form.js']
-        
-        paths
-            Mapping path names to actual deform resources. Example:
-            {'some_file_name.js': <Resource xxx>, 'deform:static/some/path.js': <Resource xxx>}
+            {'jquery.form': [<Resource 'deform:static/scripts/jquery-1.4.2.min.js'>, <Resource 'deform:static/scripts/jquery.form.js'>]
 
         libraries
             A dict of fanstatic libraries and their names. By default 'deform' is registered,
@@ -34,17 +30,18 @@ class ResourceRegistry(object):
             If you want to add your own, just modify this dict.
     """
     requirements = {}
-    paths = {}
     libraries = {}
     
-    def __init__(self, requirements = None, paths = None, libraries = None, add_basics = True):
+    def __init__(self, requirements = None, libraries = None, add_basics = True):
         self.requirements = requirements and requirements or {}
-        self.paths = paths and paths or {}
-        self.libraries = libraries and libraries or {'deform': deform_autoneed_lib}
+        self.libraries = {'deform': deform_autoneed_lib}
+        if libraries:
+            assert isinstance(libraries, dict)
+            self.libraries.update(libraries)
         if add_basics:
             self.add_deform_basics()
 
-    def create_requirement_for(self, requirement_name, resource_paths, remove_leading = 'static/', depends = ('basic',)):
+    def create_requirement_for(self, requirement_name, resource_paths, depends = ('basic',)):
         """ Updates path_resource_registry and requirement_registry with information needed to auto_need resources.
 
             requirement_name
@@ -55,11 +52,9 @@ class ResourceRegistry(object):
                 They're different depending on version:
                 Deform 1: 'scripts/jquery-1.7.2.min.js'
                 Deform 2: 'deform:static/scripts/jquery-1.7.2.min.js'
-
-            remove_leading
-                Remove this part of the path if it exist. Look at the difference between deform 1 and 2 paths,
-                hence this is needed. This doesn't effect the resource_paths specifications.
-                This is also the place to adjust your own custom widget paths.
+                
+                Any relative paths without package specification (the text before the ':') will be considered
+                as deform resources.
 
             depends
                 A list of other requirements that the added resources will depend on.
@@ -72,32 +67,33 @@ class ResourceRegistry(object):
             #Deform2 prepends path with package name. Deform 1 doesn't.
             path_items = resource_path.split(':')
             if len(path_items) == 2:
+                logger.debug("Got resource path '%s' - assuming Deform >= 2" % resource_path)
                 #Assume deform 2
                 lib_name = path_items[0]
                 if lib_name not in self.libraries:
                     raise KeyError("You tried to create requirements for the resource path '%s' which specifies a package that isn't known. "
                                    "Adjust the variable 'library_registry' and add it." % resource_path)
                 library = self.libraries[lib_name]
-                file_path = path_items[1]
-                if remove_leading and file_path.startswith(remove_leading):
-                    file_path = file_path[len(remove_leading):]
             else:
-                #Assume deform 1
+                logger.debug("Got resource path '%s' - assuming Deform < 2" % resource_path)
                 library = self.libraries['deform']
-                file_path = resource_path
-            if resource_path not in requirement:
-                logger.debug("'%s' now requires '%s'" % (library, resource_path))
-                requirement.append(resource_path)
-            if resource_path not in self.paths:
-                logger.debug("Path mapping added for '%s'" % resource_path)
+                resource_path = "deform:static/%s" % resource_path
+            abs_path = pkg_resources.resource_filename(*resource_path.split(':'))
+            rel_path = abs_path.replace("%s/" % deform_autoneed_lib.rootpath, '')
+            if rel_path not in deform_autoneed_lib.known_resources:
+                logger.debug("Adding '%s' to lib %s" % (abs_path, library))
                 depends_on = []
                 for depend in depends:
-                    depends_on.extend([self.paths[x] for x in self.requirements[depend]])
-                self.paths[resource_path] = Resource(library, file_path, depends = depends_on)
+                    depends_on.extend(self.requirements[depend])
+                resource = Resource(library, rel_path, depends = depends_on)
+                requirement.append(resource)
+            else:
+                logger.debug("Resource '%s' already known to lib %s - skipping." % (abs_path, library))
 
     def add_deform_basics(self):
         """ Add the basic deform resources, usually needed on all pages.
-            Hopefully more intelligent in the future...
+            Hopefully more intelligent in the future, but right now we
+            need to guess the included deform packages in deform2.
         """
         logger.debug("Adding deform basic needs.")
         deform_version = pkg_resources.get_distribution('deform').version
@@ -122,17 +118,16 @@ class ResourceRegistry(object):
                 if re.match('^jquery\-[0-9]{1,2}(.*)\.min\.js$', fname):
                     jquery_fname = fname
                     break
-            if not jquery_fname:
+            if not jquery_fname: #pragma : no coverage
                 raise IOError("Can't fint any jquery file within deform.")
             paths.extend(['deform:static/css/form.css',
-                          'deform:static/css/bootstrap.min.css',
-                          'deform:static/scripts/bootstrap.min.js',
-                          'deform:static/scripts/%s' % jquery_fname,])
+                          'deform:static/css/bootstrap.min.css',])
             #Pre-register bootstrap and dependency on jquery
             jquery = Resource(deform_autoneed_lib, "scripts/%s" % jquery_fname)
-            self.paths["deform:static/scripts/%s" % jquery_fname] = jquery
-            self.paths['deform:static/scripts/bootstrap.min.js'] = Resource(deform_autoneed_lib, 'scripts/bootstrap.min.js',
-                                                                           depends = (jquery,))
+            requirement = self.requirements.setdefault('basic', [])
+            requirement.append(jquery)
+            bootstrap_js = Resource(deform_autoneed_lib, 'scripts/bootstrap.min.js', depends = (jquery,))
+            requirement.append(bootstrap_js)
         self.create_requirement_for('basic', paths, depends=())
 
     def populate_from_resources(self, resource_specs = None):
@@ -157,14 +152,14 @@ def auto_need(form, reg = None):
     """ Check libraries required by the current widgets.
         Each librarys requirements is stored in the requirements_registry.
     """
-    if reg is None:
+    if reg is None: #pragma : no coverage
         reg = resource_registry
     need_lib('basic', reg = reg)
     requirements = form.get_widget_requirements()
     for library, version in requirements:
-        for path in reg.requirements.get(library, ()):
-            logger.debug('Including %s via auto_need' % path)
-            reg.paths[path].need()
+        for resource in reg.requirements.get(library, ()):
+            logger.debug('Including %s via auto_need' % resource)
+            resource.need()
 
 def need_lib(lib_name, reg = None):
     """ Call this to include for instance deforms basic components
@@ -172,9 +167,9 @@ def need_lib(lib_name, reg = None):
         If you're using twitter bootstrap from the deform package,
         just call need_lib('basic') to include it.
     """
-    if reg is None:
+    if reg is None: #pragma : no coverage
         reg = resource_registry
-    [reg.paths[path].need() for path in reg.requirements[lib_name]]
+    [resource.need() for resource in reg.requirements[lib_name]]
 
 def patch_deform():
     """ Copied from js.deform - this package should do the same thing, even though the auto_need

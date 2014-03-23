@@ -68,12 +68,6 @@ Registering a custom widgets resources
 If you're using any widgets/forms in deform that require non-standard plugins,
 you can register them within this package to include them.
 
-.. warning::
-
-    Prior to deform 2, path specifications of resources were different.
-    If you want to use a plugin with an older deform package,
-    make sure any resource paths are unique! (I.e. don't add something called 'css/form.css' for instance)
-
 First, create a Fanstatic library for your resources and an entry point in your setup.py.
 (See the Fanstatic docs for this)
 
@@ -91,21 +85,21 @@ Add your library to autoneed's registry:
     
     resource_registry.libraries['my_package_name'] = my_lib
 
-If you have structured your requirements the same way as in **deform.widget.default_resources**,
-and your directory for static resources is called **static**,
+If you have structured your requirements the same way as in ``deform.widget.default_resources``,
+and your directory for static resources is called ``static``,
 you can call the method populate from resources to automatically create your package.
 
 .. code-block:: python
 
     resource_registry.populate_from_resources(your_resources)
 
-If not, you can simply add the requirements using the method **create_requirement_for**.
+If not, you can simply add the requirements using the method ``create_requirement_for``.
 
 .. code-block:: python
 
     resource_registry.create_requirement_for('my_special_widget',
                                              ['my_package_name:my/static/css/cute.css', 'my_package_name:my/static/js/annoying.js'],
-                                             remove_leading = 'my/static')
+                                             )
 
 In other words, this example had the directory layout, where the static directory
 is the base of your fanstatic library.

@@ -32,25 +32,34 @@ class ResourceRegistryTests(TestCase):
         from deform_autoneed import ResourceRegistry
         return ResourceRegistry
 
+    def test_init(self):
+        testing_lib = Library('testing_lib', 'testing_fixture')
+        obj = self._cut(libraries = {'testing_lib': testing_lib})
+        self.assertIn('deform', obj.libraries)
+        self.assertIn('testing_lib', obj.libraries)
+
     def test_create_requirement_for_deform_1_style(self):
         reg = self._cut(add_basics = False)
         reg.create_requirement_for('something', 'css/beautify.css', depends = [])
-        self.assertIn('something', reg.requirements)
-        self.assertIn('css/beautify.css', reg.paths)
- 
+        self.assertIn('css/beautify.css', reg.libraries['deform'].known_resources)
+
     def test_create_requirement_for_deform_2_style(self):
         reg = self._cut()
         reg.create_requirement_for('something', 'deform:static/css/beautify.css', depends = [])
         self.assertIn('something', reg.requirements)
-        self.assertIn('deform:static/css/beautify.css', reg.paths)
+        self.assertIn('css/beautify.css', reg.libraries['deform'].known_resources)
  
     def test_create_requirement_for_other_lib(self):
         reg = self._cut()
         testing_fixture_dir = resource_filename('deform_autoneed', 'testing_fixture')
-        reg.libraries['other'] = Library('other', testing_fixture_dir)
-        reg.create_requirement_for('something', 'other:testing_fixture/dummy.js',
-                                   remove_leading = 'testing_fixture/', depends = ())
-        self.assertIn('other', reg.libraries)
+        reg.libraries['deform_autoneed'] = Library('deform_autoneed', testing_fixture_dir)
+        reg.create_requirement_for('something', 'deform_autoneed:testing_fixture/dummy.js',
+                                   depends = ())
+        self.assertIn('deform_autoneed', reg.libraries)
+
+    def test_create_requirement_with_unknown_lib(self):
+        obj = self._cut()
+        self.assertRaises(KeyError, obj.create_requirement_for, 'something', 'unknown:hello/file.js')
 
     def test_populate_resource_registry(self):
         reg = self._cut()
@@ -79,5 +88,37 @@ class AutoNeedTests(TestCase):
     def test_auto_need(self):
         form = _mk_richtext_form()
         self._fut(form, reg = self.reg)
+        resources = get_needed().resources()
+        self.assertIn('deform.js', [x.filename for x in resources])
+
+
+class IntegrationTests(TestCase):
+    tearDown = _clearFLib
+
+    def setUp(self):
+        _clearFLib()
+        init_needed()
+
+    def test_includeme(self):
+        import deform_autoneed
+        deform_autoneed.includeme()
+        self.assertIn('jquery.form', deform_autoneed.resource_registry.requirements)
+
+    def test_deform_integration_render(self):
+        import deform_autoneed
+        deform_autoneed.includeme()
+        form = _mk_richtext_form()
+        form.render()
+        resources = get_needed().resources()
+        self.assertIn('deform.js', [x.filename for x in resources])
+
+    def test_deform_integration_exception_render(self):
+        import deform_autoneed
+        deform_autoneed.includeme()
+        form = _mk_richtext_form()
+        try:
+            form.validate([('foo', 'bar')])
+        except deform.ValidationFailure as exc:
+            exc.render()
         resources = get_needed().resources()
         self.assertIn('deform.js', [x.filename for x in resources])
