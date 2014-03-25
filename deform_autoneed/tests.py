@@ -107,10 +107,10 @@ class ResourceRegistryTests(TestCase):
     def test_find_resource_abspath(self):
         obj = self._cut(add_basics = False)
         obj.create_requirement_for('something', 'css/beautify.css', requirement_depends = [])
-        abspath = obj.requirements['something'][0].fullpath()
+        abspath = obj._resource_fullpath(obj.requirements['something'][0])
         res = obj.find_resource(abspath)
         self.assertIsInstance(res, Resource)
-        self.assertEqual(res.fullpath(), abspath)
+        self.assertEqual(obj._resource_fullpath(res), abspath)
 
     def test_find_resource_relpath(self):
         obj = self._cut(add_basics = False)
