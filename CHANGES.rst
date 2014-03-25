@@ -1,7 +1,7 @@
 Changelog
 =========
 
-0.2b (Unreleased)
+0.2b (2014-03-25)
 -----------------
 
 - New methods to interact and replace resources.
