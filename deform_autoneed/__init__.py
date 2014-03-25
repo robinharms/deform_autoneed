@@ -1,4 +1,6 @@
 import logging
+import os
+import re
 
 from fanstatic import (Resource,
                        Library)
@@ -143,8 +145,6 @@ class ResourceRegistry(object):
         else:
             #Deform 2-style has package info as well. We use it as a fanstatic library name too
             #Guess jquery name
-            import os
-            import re
             scripts_dir = pkg_resources.resource_filename('deform', 'static/scripts')
             jquery_fname = None
             for fname in os.listdir(scripts_dir):
@@ -194,9 +194,15 @@ class ResourceRegistry(object):
                 break
         if library is None:
             raise KeyError("Couldn't find any matching library for this resource in %s" % self.libraries)
-        abs_path = resource.fullpath()
+        abs_path = self._resource_fullpath(resource)
         rel_path = abs_path.replace("%s/" % library.path, "%s/" % library.rootpath)
         return "%s:%s" % (name, rel_path)
+
+    def _resource_fullpath(self, resource):
+        """ Fetch full path for resource. This already exists in later versions
+            of fanstatic, but it's here for compat reasons.
+        """
+        return os.path.normpath(os.path.join(resource.library.path, resource.relpath))
 
     def find_resource(self, resource_path):
         """ Find the first instance of a registered resource matching this resource_path.
@@ -212,7 +218,7 @@ class ResourceRegistry(object):
         resources = set()
         [resources.update(x) for x in self.requirements.values()]
         for resource in resources:
-            if resource_path == resource.fullpath():
+            if resource_path == self._resource_fullpath(resource):
                 return resource
 
     def remove_resources(self, *resources):
