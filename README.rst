@@ -59,7 +59,25 @@ If you want any of these base packages in any other view that isn't a form, simp
     need_lib('basic')
 
 Basic means any base requirements of deform itself. You may also call other deform dependencies here.
-Essentially, you can use any key from deforms default resource registry in: **deform.widget.default_resources**.
+Essentially, you can use any key from deforms default resource registry in: ``deform.widget.default_resources``.
+
+
+Replacing a resource requirement
+--------------------------------
+
+If you wish to replace a resource with something else, ``ResourceRegistry``
+has a method for that. It will have an effect on everything that might
+depend on that resource.
+
+Example:
+
+deforms form.css is a registered requirement. We'll replace it with out own css,
+where ``our_css`` is a fanstatic resource object.
+
+resource_registry.replace_resource('deform:static/css/form.css', our_css)
+
+Note that ``replace_resource`` accepts either fanstatic.Resource``-objects
+or paths with package name, like 'deform:static/css/form.css' as arguments.
 
 
 Registering a custom widgets resources

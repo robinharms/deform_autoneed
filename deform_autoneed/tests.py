@@ -3,6 +3,7 @@ from unittest import TestCase
 import deform
 import colander
 from fanstatic import Library
+from fanstatic import Resource
 from fanstatic import get_needed
 from fanstatic import init_needed
 from pkg_resources import resource_filename
@@ -40,12 +41,12 @@ class ResourceRegistryTests(TestCase):
 
     def test_create_requirement_for_deform_1_style(self):
         reg = self._cut(add_basics = False)
-        reg.create_requirement_for('something', 'css/beautify.css', depends = [])
+        reg.create_requirement_for('something', 'css/beautify.css', requirement_depends = [])
         self.assertIn('css/beautify.css', reg.libraries['deform'].known_resources)
 
     def test_create_requirement_for_deform_2_style(self):
         reg = self._cut()
-        reg.create_requirement_for('something', 'deform:static/css/beautify.css', depends = [])
+        reg.create_requirement_for('something', 'deform:static/css/beautify.css', requirement_depends = [])
         self.assertIn('something', reg.requirements)
         self.assertIn('css/beautify.css', reg.libraries['deform'].known_resources)
  
@@ -54,8 +55,30 @@ class ResourceRegistryTests(TestCase):
         testing_fixture_dir = resource_filename('deform_autoneed', 'testing_fixture')
         reg.libraries['deform_autoneed'] = Library('deform_autoneed', testing_fixture_dir)
         reg.create_requirement_for('something', 'deform_autoneed:testing_fixture/dummy.js',
-                                   depends = ())
+                                   requirement_depends = ())
         self.assertIn('deform_autoneed', reg.libraries)
+
+    def test_create_resource_with_new_lib(self):
+        obj = self._cut()
+        testing_fixture_dir = resource_filename('deform_autoneed', 'testing_fixture')
+        library = Library('deform_autoneed', testing_fixture_dir)
+        obj.create_resource('deform_autoneed:testing_fixture/dummy.js', library = library)
+        self.assertIn('deform_autoneed', obj.libraries)
+
+    def test_create_resource_with_existing_lib(self):
+        obj = self._cut()
+        testing_fixture_dir = resource_filename('deform_autoneed', 'testing_fixture')
+        obj.libraries['deform_autoneed'] = library = Library('deform_autoneed', testing_fixture_dir)
+        res = obj.create_resource('deform_autoneed:testing_fixture/dummy.js')
+        self.assertEqual(res.library, library)
+
+    def test_create_resource_already_existing_resource(self):
+        obj = self._cut()
+        testing_fixture_dir = resource_filename('deform_autoneed', 'testing_fixture')
+        library = Library('deform_autoneed', testing_fixture_dir)
+        res1 = obj.create_resource('deform_autoneed:testing_fixture/dummy.js', library = library)
+        res2 = obj.create_resource('deform_autoneed:testing_fixture/dummy.js')
+        self.assertEqual(res1, res2)
 
     def test_create_requirement_with_unknown_lib(self):
         obj = self._cut()
@@ -66,6 +89,64 @@ class ResourceRegistryTests(TestCase):
         reg.populate_from_resources()
         self.assertIn('deform', reg.libraries)
         self.assertIn('jquery.form', reg.requirements)
+
+    def test_resource_package_path(self):
+        testing_lib = Library('deform_autoneed', 'testing_fixture')
+        resource = Resource(testing_lib, 'dummy.js')
+        obj = self._cut(libraries = {'deform_autoneed': testing_lib})
+        obj.requirements['something'] = [resource]
+        resource_path = 'deform_autoneed:testing_fixture/dummy.js'
+        self.assertEqual(obj.resource_package_path(resource), resource_path)
+
+    def test_resource_package_path_nonexistent(self):
+        testing_lib = Library('deform_autoneed', 'testing_fixture')
+        resource = Resource(testing_lib, 'dummy.js')
+        obj = self._cut()
+        self.assertRaises(KeyError, obj.resource_package_path, resource)
+
+    def test_find_resource_abspath(self):
+        obj = self._cut(add_basics = False)
+        obj.create_requirement_for('something', 'css/beautify.css', requirement_depends = [])
+        abspath = obj.requirements['something'][0].fullpath()
+        res = obj.find_resource(abspath)
+        self.assertIsInstance(res, Resource)
+        self.assertEqual(res.fullpath(), abspath)
+
+    def test_find_resource_relpath(self):
+        obj = self._cut(add_basics = False)
+        obj.create_requirement_for('something', 'css/beautify.css', requirement_depends = [])
+        relpath = 'deform:static/css/beautify.css'
+        res = obj.find_resource(relpath)
+        self.assertIsInstance(res, Resource)
+
+    def test_remove_resources(self):
+        obj = self._cut()
+        obj.create_requirement_for('something', 'css/beautify.css', requirement_depends = [])
+        #Just to make sure the test works
+        self.assertEqual(len(obj.requirements['something']), 1)
+        self.assertIn('css/beautify.css', obj.libraries['deform'].known_resources)
+        #Actual test
+        obj.remove_resources('deform:static/css/beautify.css')
+        self.assertEqual(len(obj.requirements['something']), 0)
+        self.assertNotIn('css/beautify.css', obj.libraries['deform'].known_resources)
+
+    def test_replace_resource_resource_objects(self):
+        obj = self._cut()
+        obj.libraries['deform_autoneed'] = library = Library('deform_autoneed', 'testing_fixture')
+        resource_js = Resource(library, 'dummy.js')
+        resource_css = Resource(library, 'dummy.css')
+        obj.requirements['dummy'] = [resource_js]
+        obj.replace_resource(resource_js, resource_css)
+        self.assertEqual(obj.requirements['dummy'], [resource_css])
+
+    def test_replace_resource_resource_paths(self):
+        obj = self._cut()
+        obj.libraries['deform_autoneed'] = library = Library('deform_autoneed', 'testing_fixture')
+        resource_js = Resource(library, 'dummy.js')
+        obj.requirements['dummy'] = [resource_js]
+        obj.replace_resource('deform_autoneed:testing_fixture/dummy.js', 'deform_autoneed:testing_fixture/dummy.css')
+        self.assertNotIn(resource_js, obj.requirements['dummy'])
+        self.assertEqual(obj.requirements['dummy'][0].relpath, 'dummy.css')
 
 
 class AutoNeedTests(TestCase):

@@ -27,7 +27,8 @@ class ResourceRegistry(object):
         libraries
             A dict of fanstatic libraries and their names. By default 'deform' is registered,
             and any package specifying a path that starts with 'deform:' will use this library.
-            If you want to add your own, just modify this dict.
+            The convention is that the key for each library must be the same as the package name.
+            A resource path like ``deform:some/resouce.js`` will use the library located in self.libraries['deform'].
     """
     requirements = {}
     libraries = {}
@@ -41,7 +42,7 @@ class ResourceRegistry(object):
         if add_basics:
             self.add_deform_basics()
 
-    def create_requirement_for(self, requirement_name, resource_paths, depends = ('basic',)):
+    def create_requirement_for(self, requirement_name, resource_paths, requirement_depends = ('basic',)):
         """ Updates path_resource_registry and requirement_registry with information needed to auto_need resources.
 
             requirement_name
@@ -56,7 +57,7 @@ class ResourceRegistry(object):
                 Any relative paths without package specification (the text before the ':') will be considered
                 as deform resources.
 
-            depends
+            requirement_depends
                 A list of other requirements that the added resources will depend on.
                 It will iterate on all the libraries in these and add them as a dependency.
         """
@@ -77,18 +78,50 @@ class ResourceRegistry(object):
             else:
                 logger.debug("Got resource path '%s' - assuming Deform < 2" % resource_path)
                 library = self.libraries['deform']
-                resource_path = "deform:static/%s" % resource_path
-            abs_path = pkg_resources.resource_filename(*resource_path.split(':'))
-            rel_path = abs_path.replace("%s/" % deform_autoneed_lib.rootpath, '')
-            if rel_path not in deform_autoneed_lib.known_resources:
-                logger.debug("Adding '%s' to lib %s" % (abs_path, library))
-                depends_on = []
-                for depend in depends:
-                    depends_on.extend(self.requirements[depend])
-                resource = Resource(library, rel_path, depends = depends_on)
+                resource_path = "deform:static/%s" % resource_path            
+            depends_on = []
+            for depend in requirement_depends:
+                depends_on.extend(self.requirements[depend])
+            resource = self.create_resource(resource_path, library = library, depends = depends_on)
+            if resource not in requirement:
                 requirement.append(resource)
+
+    def create_resource(self, resource_path, library = None, depends = ()):
+        """ Create a ``fanstatic.Resource`` object from a path. Returns created object
+            or an already existing resource if one already existed.
+            
+            resource_path
+                Specified with package or as an absolute path.
+
+            library
+                A ``fanstatic.Library`` you wish to add the resource to.
+                It will also be added to the attribute libraries if it doesn't
+                already exist. If it alredy exist, it's an optional argument
+
+            depends
+                Passed to Resource as dependency. Must be dependable objects
+                like ``fanstatic.Resource``.
+            
+        """
+        lib_name, path = resource_path.split(':')
+        if lib_name not in self.libraries:
+            assert isinstance(library, Library)
+            self.libraries[lib_name] = library
+        else:
+            if library is not None:
+                assert library == self.libraries[lib_name]
             else:
-                logger.debug("Resource '%s' already known to lib %s - skipping." % (abs_path, library))
+                library = self.libraries[lib_name]
+        abs_path = pkg_resources.resource_filename(lib_name, path)
+        rel_path = abs_path.replace("%s/" % library.path, '')
+        if rel_path not in library.known_resources:
+            logger.debug("Adding '%s' to lib %s" % (abs_path, library))
+            resource = Resource(library, rel_path, depends = depends)
+            return resource
+        else:
+            logger.debug("Resource '%s' already known to lib %s - skipping." % (abs_path, library))
+            return library.known_resources[rel_path]
+            #fixme: return already existing resource
 
     def add_deform_basics(self):
         """ Add the basic deform resources, usually needed on all pages.
@@ -128,7 +161,7 @@ class ResourceRegistry(object):
             requirement.append(jquery)
             bootstrap_js = Resource(deform_autoneed_lib, 'scripts/bootstrap.min.js', depends = (jquery,))
             requirement.append(bootstrap_js)
-        self.create_requirement_for('basic', paths, depends=())
+        self.create_requirement_for('basic', paths, requirement_depends=())
 
     def populate_from_resources(self, resource_specs = None):
         """ Walk through resources from deform or another package
@@ -143,6 +176,74 @@ class ResourceRegistry(object):
             for resources in rinfo.values():
                 for (res_type, resource_paths) in resources.items():
                     self.create_requirement_for(requirement_name, resource_paths)
+
+    def resource_package_path(self, resource):
+        """ Find the resources package path, similar to:
+            ``package:some/path/to/resource.css``
+            The library must exist in self.libraries since the name of the library
+            will be used as package name. (They must always be the same)
+            
+            resource
+                Must be an instance of ``fanstatic.Resource``
+        """
+        assert isinstance(resource, Resource)
+        library = None
+        for (name, lib) in self.libraries.items():
+            if resource.library == lib:
+                library = lib
+                break
+        if library is None:
+            raise KeyError("Couldn't find any matching library for this resource in %s" % self.libraries)
+        abs_path = resource.fullpath()
+        rel_path = abs_path.replace("%s/" % library.path, "%s/" % library.rootpath)
+        return "%s:%s" % (name, rel_path)
+
+    def find_resource(self, resource_path):
+        """ Find the first instance of a registered resource matching this resource_path.
+        
+            resource_path
+                Can be either a repative path with package name like: ``deform:static/scripts/deform.js``
+                or a full path.
+        """
+        assert isinstance(resource_path, str)
+        if ':' in resource_path:
+            #Assume package
+            resource_path = pkg_resources.resource_filename(*resource_path.split(':'))
+        resources = set()
+        [resources.update(x) for x in self.requirements.values()]
+        for resource in resources:
+            if resource_path == resource.fullpath():
+                return resource
+
+    def remove_resources(self, *resources):
+        """ A method to remove a resource from the requirements and from the library it's registered in.
+        """
+        for resource in resources:
+            if isinstance(resource, str):
+                resource = self.find_resource(resource)
+            assert isinstance(resource, Resource)
+            [x.remove(resource) for x in self.requirements.values() if resource in x]
+            del resource.library.known_resources[resource.relpath]
+
+    def replace_resource(self, old, new):
+        """ Replace a resource with a new one.
+            You can either specify a resource as a package path, IE:
+            ``somepackage:path/to/file.js``
+            or as a ``fanstatic.Resource instance.``
+            
+            The resource will not be removed from its library, only changed
+        """
+        if isinstance(old, str):
+            old = self.find_resource(old)
+        assert isinstance(old, Resource)
+        if isinstance(new, str):
+            new = self.create_resource(new)
+        assert isinstance(new, Resource)
+        for resources in self.requirements.values():
+            if old in resources:
+                pos = resources.index(old)
+                resources.insert(pos, new)
+                resources.remove(old)
 
 
 resource_registry = ResourceRegistry()
