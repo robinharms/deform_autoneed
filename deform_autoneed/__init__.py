@@ -66,6 +66,7 @@ class ResourceRegistry(object):
         requirement = self.requirements.setdefault(requirement_name, [])
         if isinstance(resource_paths, str):
             resource_paths = (resource_paths,)
+        previous = None #To inject linear dependencies
         for resource_path in resource_paths:
             #Deform2 prepends path with package name. Deform 1 doesn't.
             path_items = resource_path.split(':')
@@ -84,9 +85,12 @@ class ResourceRegistry(object):
             depends_on = []
             for depend in requirement_depends:
                 depends_on.extend(self.requirements[depend])
+            if previous and previous not in depends_on:
+                depends_on.append(previous)
             resource = self.create_resource(resource_path, library = library, depends = depends_on)
             if resource not in requirement:
                 requirement.append(resource)
+            previous = resource
 
     def create_resource(self, resource_path, library = None, depends = ()):
         """ Create a ``fanstatic.Resource`` object from a path. Returns created object

@@ -60,6 +60,20 @@ class ResourceRegistryTests(TestCase):
                                    requirement_depends = ())
         self.assertIn('deform_autoneed', reg.libraries)
 
+    def test_create_requirement_for_several_paths_have_each_other_as_dependencies(self):
+        obj = self._cut()
+        testing_fixture_dir = resource_filename('deform_autoneed', 'testing_fixture')
+        obj.libraries['deform_autoneed'] = Library('deform_autoneed', testing_fixture_dir)
+        paths = ('deform_autoneed:testing_fixture/dummy.js',
+                 'deform_autoneed:testing_fixture/dummy.css',
+                 'deform_autoneed:testing_fixture/dummy2.css')
+        obj.create_requirement_for('something', paths, requirement_depends = ())
+        one = obj.requirements['something'][0]
+        two = obj.requirements['something'][1]
+        three = obj.requirements['something'][2]
+        self.assertIn(one, two.depends)
+        self.assertIn(two, three.depends)
+
     def test_create_resource_with_new_lib(self):
         obj = self._cut()
         testing_fixture_dir = resource_filename('deform_autoneed', 'testing_fixture')

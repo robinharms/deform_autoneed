@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.2.2b (2014-04-08)
+-------------------
+
+- Resource dependencies consider the order deform list them.
+  A widget requirement with several listed resources will have them depend on each other in order.
+
 0.2.1b (2014-04-08)
 -------------------
 
