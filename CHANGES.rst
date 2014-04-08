@@ -1,6 +1,14 @@
 Changelog
 =========
 
+0.2.1b (2014-04-08)
+-------------------
+
+- NOTE: ``remove_resources`` changed to ``remove_resource`` - it only accepts
+  one resource now.
+- Replacing resources may require to replace dependencies as well.
+  This is now the default option for ``replace_resource`` and ``remove_resource``.
+
 0.2b (2014-03-25)
 -----------------
 

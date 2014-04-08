@@ -13,7 +13,7 @@ requires = [
     ]
 
 setup(name='deform_autoneed',
-      version='0.2b',
+      version='0.2.1b',
       description='Auto include resources in deform via Fanstatic.',
       long_description=README + '\n\n' +  CHANGES,
       classifiers=[

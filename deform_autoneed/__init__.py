@@ -221,23 +221,36 @@ class ResourceRegistry(object):
             if resource_path == self._resource_fullpath(resource):
                 return resource
 
-    def remove_resources(self, *resources):
+    def remove_resource(self, resource, dependencies = True):
         """ A method to remove a resource from the requirements and from the library it's registered in.
         """
-        for resource in resources:
-            if isinstance(resource, str):
-                resource = self.find_resource(resource)
-            assert isinstance(resource, Resource)
-            [x.remove(resource) for x in self.requirements.values() if resource in x]
-            del resource.library.known_resources[resource.relpath]
+        if isinstance(resource, str):
+            resource = self.find_resource(resource)
+        assert isinstance(resource, Resource)
+        for resources in self.requirements.values():
+            if resource in resources:
+                resources.remove(resource)
+            if dependencies:
+                for res in resources:
+                    if resource in res.depends:
+                        res.depends.remove(resource)
+                    if resource in res.resources:
+                        res.resources.remove(resource)
+        del resource.library.known_resources[resource.relpath]
 
-    def replace_resource(self, old, new):
+    def replace_resource(self, old, new, dependencies = True):
         """ Replace a resource with a new one.
             You can either specify a resource as a package path, IE:
             ``somepackage:path/to/file.js``
             or as a ``fanstatic.Resource instance.``
             
             The resource will not be removed from its library, only changed
+            
+            dependencies
+                Also handle dependencies of all resources. A replaced resource
+                will also replace dependencies of other resources.
+                (For instance, if you replace jquery version, anything depending
+                on jquery will depend on your new resource instead)
         """
         if isinstance(old, str):
             old = self.find_resource(old)
@@ -249,8 +262,13 @@ class ResourceRegistry(object):
             if old in resources:
                 pos = resources.index(old)
                 resources.insert(pos, new)
-                resources.remove(old)
-
+            if dependencies:
+                for res in resources:
+                    if old in res.depends:
+                        res.depends.add(new)
+                    if old in res.resources:
+                        res.resources.add(new)
+        self.remove_resource(old, dependencies = dependencies)
 
 resource_registry = ResourceRegistry()
 

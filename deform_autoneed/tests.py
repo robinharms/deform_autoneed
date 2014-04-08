@@ -17,6 +17,8 @@ def _clearFLib(*args):
     from deform_autoneed import deform_autoneed_lib
     #To clear any old registered resources - needs to be done on test start too for some reason.
     deform_autoneed_lib.known_resources = {}
+    init_needed()
+
 
 def _mk_richtext_form():
     class Schema(colander.Schema):
@@ -119,16 +121,30 @@ class ResourceRegistryTests(TestCase):
         res = obj.find_resource(relpath)
         self.assertIsInstance(res, Resource)
 
-    def test_remove_resources(self):
+    def test_remove_resource(self):
         obj = self._cut()
         obj.create_requirement_for('something', 'css/beautify.css', requirement_depends = [])
         #Just to make sure the test works
         self.assertEqual(len(obj.requirements['something']), 1)
         self.assertIn('css/beautify.css', obj.libraries['deform'].known_resources)
         #Actual test
-        obj.remove_resources('deform:static/css/beautify.css')
+        obj.remove_resource('deform:static/css/beautify.css')
         self.assertEqual(len(obj.requirements['something']), 0)
         self.assertNotIn('css/beautify.css', obj.libraries['deform'].known_resources)
+
+    def test_remove_resource_with_deps(self):
+        obj = self._cut()
+        obj.libraries['deform_autoneed'] = library = Library('deform_autoneed', 'testing_fixture')
+        unwanted_dependency = Resource(library, 'dummy.css')
+        resource_with_requirement = Resource(library, 'dummy.js', depends = (unwanted_dependency,))
+        obj.requirements['dummy'] = [resource_with_requirement, unwanted_dependency]
+        obj.remove_resource(unwanted_dependency)
+        from deform_autoneed import need_lib
+        need_lib('dummy', reg = obj)
+        resources = get_needed().resources()
+        self.assertEqual(len(obj.requirements['dummy']), 1)
+        self.assertNotIn('dummy.css', [x.filename for x in resources])
+        self.assertEqual(len(resources), 1)
 
     def test_replace_resource_resource_objects(self):
         obj = self._cut()
@@ -148,6 +164,21 @@ class ResourceRegistryTests(TestCase):
         self.assertNotIn(resource_js, obj.requirements['dummy'])
         self.assertEqual(obj.requirements['dummy'][0].relpath, 'dummy.css')
 
+    def test_replace_resource_that_has_a_requirement(self):
+        obj = self._cut()
+        obj.libraries['deform_autoneed'] = library = Library('deform_autoneed', 'testing_fixture')
+        unwanted_dependency = Resource(library, 'dummy.css')
+        wanted_resource = Resource(library, 'dummy2.css')
+        resource_with_requirement = Resource(library, 'dummy.js', depends = (unwanted_dependency,))
+        obj.requirements['dummy'] = [resource_with_requirement, unwanted_dependency]
+        obj.replace_resource(unwanted_dependency, wanted_resource)
+        from deform_autoneed import need_lib
+        need_lib('dummy', reg = obj)
+        resources = get_needed().resources()
+        self.assertEqual(len(obj.requirements['dummy']), 2)
+        self.assertNotIn('dummy.css', [x.filename for x in resources])
+        self.assertEqual(len(resources), 2)
+
 
 class AutoNeedTests(TestCase):
     tearDown = _clearFLib
@@ -156,10 +187,6 @@ class AutoNeedTests(TestCase):
         _clearFLib()
         self.reg = _mk_reg()
         self.reg.populate_from_resources()
-        init_needed()
-
-    def tearDown(self):
-        _clearFLib()
 
     @property
     def _fut(self):
@@ -174,11 +201,7 @@ class AutoNeedTests(TestCase):
 
 
 class IntegrationTests(TestCase):
-    tearDown = _clearFLib
-
-    def setUp(self):
-        _clearFLib()
-        init_needed()
+    tearDown = setUp = _clearFLib
 
     def test_includeme(self):
         import deform_autoneed
