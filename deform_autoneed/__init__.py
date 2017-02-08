@@ -69,7 +69,7 @@ class ResourceRegistry(object):
         previous = None #To inject linear dependencies
         for resource_path in resource_paths:
             #Deform2 prepends path with package name. Deform 1 doesn't.
-            path_items = resource_path.split(':')
+            path_items = resource_path.split(':', 1)
             if len(path_items) == 2:
                 logger.debug("Got resource path '%s' - assuming Deform >= 2" % resource_path)
                 #Assume deform 2
@@ -81,7 +81,7 @@ class ResourceRegistry(object):
             else:
                 logger.debug("Got resource path '%s' - assuming Deform < 2" % resource_path)
                 library = self.libraries['deform']
-                resource_path = "deform:static/%s" % resource_path            
+                resource_path = "deform:static/%s" % resource_path
             depends_on = []
             for depend in requirement_depends:
                 depends_on.extend(self.requirements[depend])
@@ -109,7 +109,7 @@ class ResourceRegistry(object):
                 like ``fanstatic.Resource``.
             
         """
-        lib_name, path = resource_path.split(':')
+        lib_name, path = resource_path.split(':', 1)
         if lib_name not in self.libraries:
             assert isinstance(library, Library)
             self.libraries[lib_name] = library
@@ -119,7 +119,8 @@ class ResourceRegistry(object):
             else:
                 library = self.libraries[lib_name]
         abs_path = pkg_resources.resource_filename(lib_name, path)
-        rel_path = abs_path.replace("%s/" % library.path, '')
+        rel_path = abs_path.replace("%s%s" % (library.path, os.sep), '')
+        rel_path = rel_path.replace(os.sep, '/')
         if rel_path not in library.known_resources:
             logger.debug("Adding '%s' to lib %s" % (abs_path, library))
             resource = Resource(library, rel_path, depends = depends)
@@ -199,7 +200,8 @@ class ResourceRegistry(object):
         if library is None:
             raise KeyError("Couldn't find any matching library for this resource in %s" % self.libraries)
         abs_path = self._resource_fullpath(resource)
-        rel_path = abs_path.replace("%s/" % library.path, "%s/" % library.rootpath)
+        rel_path = abs_path.replace("%s%s" % (library.path, os.sep), "%s%s" % (library.rootpath, os.sep))
+        rel_path = rel_path.replace(os.sep, '/')
         return "%s:%s" % (name, rel_path)
 
     def _resource_fullpath(self, resource):
@@ -218,7 +220,10 @@ class ResourceRegistry(object):
         assert isinstance(resource_path, str)
         if ':' in resource_path:
             #Assume package
-            resource_path = pkg_resources.resource_filename(*resource_path.split(':'))
+            try:
+                resource_path = pkg_resources.resource_filename(*resource_path.split(':', 1))
+            except ImportError: # Assume assumption was wrong (probably a MS Windows path)
+                pass
         resources = set()
         [resources.update(x) for x in self.requirements.values()]
         for resource in resources:
