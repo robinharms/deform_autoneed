@@ -10,5 +10,7 @@ script:
   - python setup.py test
   - pip install . -r requirements_deform_2.0.a2.txt
   - python setup.py test
+  - pip install . -r requirements_deform_2.0.3.txt
+  - python setup.py test
   - pip install -U deform colander
   - python setup.py test
