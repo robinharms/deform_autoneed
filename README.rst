@@ -17,10 +17,10 @@ deform ships with. Hence it should be compatible with any version of deform.
     :target: https://travis-ci.org/robinharms/deform_autoneed
 
 Tested with the following deform/Python versions:
- - Python 2.7, 3.2, 3.3
- - deform 0.9.5 - Python 2.7
- - deform 0.9.9 - Python 2.7, 3.2, 3.3
- - deform 2.0a.2 - Python 2.7, 3.2, 3.3
+ - Python 2.7, 3.3, 3.6
+ - deform 0.9.9
+ - deform 2.0a.2
+ - deform 2.0.3
 
 It should be compatible with most fanstatic versions,
 including current stable 0.16 and future 1.0x.
