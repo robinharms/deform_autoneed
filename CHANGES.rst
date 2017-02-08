@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.2.3b (2017-02-08)
+-------------------
+
+- Fixes for Windows paths. While windows isn't tested and maintained, it should work now. [sassur]
+
+
 0.2.2b (2014-04-08)
 -------------------
 
