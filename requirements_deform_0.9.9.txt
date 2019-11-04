@@ -1,2 +1,2 @@
 deform==0.9.9
-colander==1.0b1
+colander==1.7.0
