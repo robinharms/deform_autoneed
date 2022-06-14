@@ -1,6 +1,8 @@
 Deform Autoneed README
 ======================
 
+ARCHIVED, no longer maintained!
+
 A simple package to turn any `deform <http://docs.pylonsproject.org/projects/deform>`_
 requirements into `Fanstatic <http::/fanstatic.org>`_ resources and serve them.
 
